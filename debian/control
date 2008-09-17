@@ -1,0 +1,14 @@
+Source: git-commitlogs
+Section: utils
+Maintainer: Mikhail Gusarov <dottedmag@dottedmag.net>
+Build-Depends: debhelper (>> 4)
+Priority: oprional
+Standards-Version: 3.6.2
+
+Package: git-commitlogs
+Section: utils
+Priority: optional
+Architecture: all
+Depends: diffstat, git-core, bsd-mailx
+Description: git hook for sending commit mails
+ This package includes git hook for sending commit mails a la fd.o one.

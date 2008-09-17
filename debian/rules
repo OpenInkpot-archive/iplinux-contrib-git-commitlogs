@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+clean:
+	dh_testdir
+	dh_testroot
+	dh_clean
+
+install:
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+
+	mkdir -p debian/git-commitlogs/usr/bin
+	install -m755 git-commitlogs debian/git-commitlogs/usr/bin
+
+binary-arch: install
+	dh_testdir
+	dh_testroot
+
+	dh_installchangelogs
+	dh_installdocs
+	dh_compress
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
+binary: binary-arch
+
+.PHONY: configure clean build install binary-arch binary

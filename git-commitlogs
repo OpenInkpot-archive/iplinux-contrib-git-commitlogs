@@ -1,0 +1,152 @@
+#!/bin/sh
+#
+# Called by git-receive-pack with arguments: refname sha1-old sha1-new
+#
+
+#
+# required: diffstat, basename, dirname, git, sed, mail
+#
+
+set -e
+
+# --- Functions ---
+
+error() {
+    echo "(EE): $@"
+}
+
+info() {
+    echo "(II): $@"
+}
+
+ok() {
+    echo "(OK): $@"
+}
+
+# --- Command line ---
+
+refname="$1"
+oldrev="$2"
+newrev="$3"
+
+# --- Safety check ---
+
+if [ -z "$GIT_DIR" ]; then
+	error "Don't run this script from the command line." >&2
+	error " (if you want, you could supply GIT_DIR then run" >&2
+	error "  $0 <ref> <oldrev> <newrev>)" >&2
+	exit 1
+fi
+
+if [ -z "$refname" -o -z "$oldrev" -o -z "$newrev" ]; then
+	info "Usage: $0 <ref> <oldrev> <newrev>" >&2
+	exit 1
+fi
+
+# -- Repo information --
+
+project=$(basename $(pwd) .git)
+repo_dirname=$(dirname $(pwd))
+
+# --- Config ---
+
+recipients=$(git config --get-all hooks.commitlog.recipients)
+commitlog_dirs=$(git config --get-all hooks.commitlog.dirs)
+
+# --- Run only on requested repositories ---
+
+in_commitlog_dir() {
+    for dir in $commitlog_dirs; do
+        if [ $1 = $dir ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+if ! in_commitlog_dir $repo_dirname; then
+    info "Skipping sending commit log $repo_dirname, not in commitlog.dirs"
+    exit 0
+fi
+
+# --- Commitlog! ---
+
+ref_type=$(git cat-file -t "$3")
+
+# set this  to 'cat' to get a very detailed listing.
+# short only kicks in when an annotated tag is added
+short='git shortlog'
+
+# see 'date --help' for info on how to write this
+# The default is a human-readable iso8601-like format with minute
+# precision ('2006-01-25 15:58 +0100' for example)
+date_format="%F %R %z"
+
+# Set to the number of pathname components you want in the subject line to
+# indicate which components of a project changed.
+num_path_components=3
+
+# Set subject
+if expr "$2" : '0*$' >/dev/null ; then
+	subject="Changes to '${1##refs/heads/}'"
+else
+	base=$(git-merge-base "$2" "$3")
+        commits=$(git-rev-list "$3" "^$base" | wc -l)
+	if [ "$commits" -ne 1 ] ; then
+		subject="$commits commits ${subject:+- ${subject}}"
+	fi
+	branch="${1##refs/heads/}"
+	subject="Branch '$branch' ${subject:+- ${subject}}"
+fi
+
+if expr "$2" : '0*$' >/dev/null
+then
+	# new ref
+	case "$1" in
+	refs/tags/*)
+		# a pushed and annotated tag (usually) means a new version
+		tag="${1##refs/tags/}"
+		if [ "$ref_type" = tag ]; then
+			eval $(git cat-file tag $3 | \
+				sed -n '4s/tagger \([^>]*>\)[^0-9]*\([0-9]*\).*/tagger="\1" ts="\2"/p')
+			date=$(date --date="1970-01-01 00:00:00 $ts seconds" +"$date_format")
+			echo "Tag '$tag' created by $tagger at $date"
+			git cat-file tag $3 | sed -n '5,$p'
+			echo
+		fi
+		prev=$(git describe --abbrev=0 "$3^")
+
+		# the first tag in a repo will yield no $prev
+		if [ -z "$prev" ]; then
+			echo "Changes since the dawn of time:"
+			git rev-list --pretty $3 | $short
+		else
+			echo "Changes since $prev:"
+			git rev-list --pretty $prev..$3 | $short
+			echo ---
+			git diff $prev..$3 | diffstat -p1
+			echo ---
+		fi
+		;;
+
+	refs/heads/*)
+		branch="${1##refs/heads/}"
+		echo "New branch '$branch' available with the following commits:"
+		git-rev-list --pretty "$3" $(git-rev-parse --not --all)
+		;;
+	esac
+else
+	case "$base" in
+	"$2")
+		git diff "$3" "^$base" | diffstat -p1
+		echo
+		echo "New commits:"
+		;;
+	*)
+		echo "Rebased ref, commits from common ancestor:"
+		;;
+	esac
+	git-rev-list "$3" "^$base" | while read rev; do git-show $rev; done
+fi |
+mail -s "[$project] $subject" $recipients
+exit 0

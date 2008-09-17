@@ -1,0 +1,18 @@
+git-commitlogs (0.1.2) unstable; urgency=low
+
+  * Added cleaning up .git suffix from project name.
+
+ -- Mikhail Gusarov <dottedmag@dottedmag.net>  Wed, 17 Sep 2008 06:13:36 +0700
+
+git-commitlogs (0.1.1) unstable; urgency=low
+
+  * Fixed error/info/ok functions.
+
+ -- Mikhail Gusarov <dottedmag@dottedmag.net>  Wed, 17 Sep 2008 06:06:43 +0700
+
+git-commitlogs (0.1) unstable; urgency=low
+
+  * First version
+
+ -- Mikhail Gusarov <dottedmag@dottedmag.net>  Wed, 17 Sep 2008 05:49:37 +0700
+
